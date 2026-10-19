@@ -252,15 +252,15 @@
       line-height: 1.4;
     }
 
-    .music-full-track-link {
+    .music-youtube-link {
       display: grid;
       min-height: 44px;
       place-items: center;
       padding: 9px 12px;
-      border: 1px solid #176b3a;
+      border: 1px solid #a20e16;
       border-radius: 10px;
-      background: #1ed760;
-      color: #102b1a;
+      background: #e62117;
+      color: #fff;
       font-size: 14px;
       font-weight: 800;
       text-align: center;
@@ -268,8 +268,8 @@
       touch-action: manipulation;
     }
 
-    .music-full-track-link:focus-visible { outline: 3px solid var(--purple); outline-offset: 2px; }
-    .music-full-track-link[hidden] { display: none; }
+    .music-youtube-link:focus-visible { outline: 3px solid var(--purple); outline-offset: 2px; }
+    .music-youtube-link[hidden] { display: none; }
 
     .music-player-shell {
       width: 100%;
@@ -1666,25 +1666,25 @@
         <label class="music-select-label" for="music-select">Elige una canción</label>
         <select class="music-select" id="music-select" aria-describedby="music-player-status">
           <option value="" selected disabled>Selecciona una canción</option>
-          <option value="3zNcn4BaVfKORyx3uDfruW">Aprender a quererte</option>
-          <option value="1D0wDWgc24OzKjFowMMxWH">Bajo la mesa</option>
-          <option value="3iyCM8b7clmfGHTAeIzFHK">El embrujo</option>
-          <option value="5KgdtjmglXPjJNKvMvSjgo">Besos en guerra</option>
-          <option value="2fCJ4fe6s0CIRfcJpgMBpX">Cuando el amor se escapa</option>
-          <option value="2kVtMvrlcK5SRxZvdHgTzn">Mi suerte</option>
-          <option value="3dtdmf6pvv11KNJWxKlT07">Mil tormentas</option>
-          <option value="5gipgJiWDAjeZiebW0nr0G">Mi vida entera</option>
-          <option value="5H7E0UH2F8drwjoz9ufPQm">Mi nuevo vicio</option>
-          <option value="54MXhSrLE17XFvN9EKgPaF">De Ludwin para ti</option>
-          <option value="4NiITCc4gDXURoiQ5a7sjj">De mí para ti</option>
+          <option value="OukQDrJ7QRQ">Aprender a quererte</option>
+          <option value="hVR5KK2T8zQ">Bajo la mesa</option>
+          <option value="X0KkNGp6YNU">El embrujo</option>
+          <option value="1oeD2m2UQAI">Besos en guerra</option>
+          <option value="IaONcfo04mc">Cuando el amor se escapa</option>
+          <option value="sfv0xWONROg">Mi suerte</option>
+          <option value="ZCh1O-7oTUI">Mil tormentas</option>
+          <option value="o1LulB1uFOA">Mi vida entera</option>
+          <option value="lkg-eJqUGfg">Mi nuevo vicio</option>
+          <option value="search:De Ludwin para ti">De Ludwin para ti</option>
+          <option value="search:De mí para ti">De mí para ti</option>
         </select>
-        <p class="music-player-status" id="music-player-status" role="status" aria-live="polite">Elige una canción para abrirla en el reproductor de Spotify.</p>
-        <a class="music-full-track-link" id="music-full-track-link" href="https://open.spotify.com/" target="_blank" rel="noopener noreferrer" hidden>Escuchar completa en Spotify</a>
-        <div class="music-player-shell" id="music-player-shell" aria-label="Reproductor de audio de Morat en Spotify" hidden>
+        <p class="music-player-status" id="music-player-status" role="status" aria-live="polite">Elige una canción para reproducirla en YouTube aquí en la página.</p>
+        <a class="music-youtube-link" id="music-youtube-link" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" hidden>Abrir en YouTube</a>
+        <div class="music-player-shell" id="music-player-shell" aria-label="Reproductor de YouTube" hidden>
           <iframe
             id="music-player"
-            title="Reproductor de Spotify"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            title="Reproductor de YouTube"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowfullscreen
             loading="lazy"
           ></iframe>
@@ -1998,22 +1998,33 @@
       const musicPlayer = document.getElementById("music-player");
       const musicPlayerShell = document.getElementById("music-player-shell");
       const musicPlayerStatus = document.getElementById("music-player-status");
-      const musicFullTrackLink = document.getElementById("music-full-track-link");
-      const musicTrackIds = Array.from(musicSelect.options, (option) => option.value).filter(Boolean);
+      const musicYoutubeLink = document.getElementById("music-youtube-link");
 
-      function loadSelectedSpotifyTrack() {
-        const trackId = musicSelect.value;
-        if (!musicTrackIds.includes(trackId)) return;
-        musicPlayerShell.hidden = false;
+      function loadSelectedYoutubeTrack() {
+        const track = musicSelect.selectedOptions[0];
+        const trackId = track?.value;
+        if (!trackId) return;
         const songName = musicSelect.selectedOptions[0].textContent;
-        musicPlayer.src = `https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`;
-        musicFullTrackLink.href = `https://open.spotify.com/track/${trackId}`;
-        musicFullTrackLink.hidden = false;
-        musicPlayerStatus.textContent = `El reproductor de la página muestra una vista previa de ${songName}. Abre la canción en Spotify para escucharla completa.`;
+        if (trackId.startsWith("search:")) {
+          const query = `${songName} canción oficial`;
+          musicPlayer.removeAttribute("src");
+          musicPlayerShell.hidden = true;
+          musicYoutubeLink.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+          musicYoutubeLink.textContent = `Buscar «${songName}» en YouTube`;
+          musicYoutubeLink.hidden = false;
+          musicPlayerStatus.textContent = "No hay un video verificado para esta canción; puedes buscarla en YouTube.";
+          return;
+        }
+        musicPlayer.src = `https://www.youtube.com/embed/${encodeURIComponent(trackId)}?playsinline=1&rel=0`;
+        musicPlayerShell.hidden = false;
+        musicYoutubeLink.href = `https://www.youtube.com/watch?v=${encodeURIComponent(trackId)}`;
+        musicYoutubeLink.textContent = "Abrir en YouTube";
+        musicYoutubeLink.hidden = false;
+        musicPlayerStatus.textContent = `Reproduce ${songName} aquí en la página.`;
       }
 
       musicSelect.addEventListener("change", () => {
-        loadSelectedSpotifyTrack();
+        loadSelectedYoutubeTrack();
       });
 
       musicWidgetToggle.addEventListener("click", () => {
