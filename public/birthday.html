@@ -252,29 +252,6 @@
       line-height: 1.4;
     }
 
-    .music-account-actions {
-      display: grid;
-      gap: 8px;
-    }
-
-    .music-account-button {
-      min-height: 44px;
-      padding: 9px 12px;
-      border: 1px solid #176b3a;
-      border-radius: 10px;
-      background: #1ed760;
-      color: #102b1a;
-      cursor: pointer;
-      font: inherit;
-      font-size: 14px;
-      font-weight: 800;
-      touch-action: manipulation;
-    }
-
-    .music-account-button:disabled { cursor: wait; opacity: .65; }
-    .music-account-button:focus-visible { outline: 3px solid var(--purple); outline-offset: 2px; }
-    .music-account-button[hidden] { display: none; }
-
     .music-player-shell {
       width: 100%;
       height: 352px;
@@ -1682,11 +1659,7 @@
           <option value="54MXhSrLE17XFvN9EKgPaF">De Ludwin para ti</option>
           <option value="4NiITCc4gDXURoiQ5a7sjj">De mí para ti</option>
         </select>
-        <div class="music-account-actions">
-          <button class="music-account-button" id="music-connect" type="button">Conectar mi cuenta de Spotify</button>
-          <button class="music-account-button" id="music-play-in-page" type="button" hidden>Reproducir aquí en la página</button>
-        </div>
-        <p class="music-player-status" id="music-player-status" role="status" aria-live="polite">Elige una canción, conecta tu cuenta de Spotify y reprodúcela aquí. Spotify Premium es necesario para escuchar canciones completas en el reproductor web.</p>
+        <p class="music-player-status" id="music-player-status" role="status" aria-live="polite">Elige una canción para abrirla en el reproductor de Spotify.</p>
         <div class="music-player-shell" id="music-player-shell" aria-label="Reproductor de audio de Morat en Spotify" hidden>
           <iframe
             id="music-player"
@@ -2005,342 +1978,20 @@
       const musicPlayer = document.getElementById("music-player");
       const musicPlayerShell = document.getElementById("music-player-shell");
       const musicPlayerStatus = document.getElementById("music-player-status");
-      const musicConnectButton = document.getElementById("music-connect");
-      const musicPlayButton = document.getElementById("music-play-in-page");
       const musicTrackIds = Array.from(musicSelect.options, (option) => option.value).filter(Boolean);
-      const spotifyClientId = "08114ea95467443ca4dd52160d7dbc69";
-      const spotifyRedirectUri = `${window.location.origin}${window.location.pathname}`;
-      const spotifyScopes = ["streaming", "user-read-email", "user-read-private", "user-read-playback-state", "user-modify-playback-state"];
-      const spotifyVerifierKey = "birthday-spotify-code-verifier";
-      const spotifyStateKey = "birthday-spotify-state";
-      const spotifyTrackKey = "birthday-spotify-selected-track";
-      let spotifyAccessToken = "";
-      let spotifyRefreshToken = "";
-      let spotifyTokenExpiresAt = 0;
-      let spotifyPlayer = null;
-      let spotifyDeviceId = "";
-      let spotifyCurrentTrackId = "";
-      let spotifyIsPlaying = false;
-      let spotifySdkLoading = false;
-
-      try {
-        const savedTrackId = readSpotifySessionValue(spotifyTrackKey);
-        if (musicTrackIds.includes(savedTrackId)) musicSelect.value = savedTrackId;
-      } catch (error) {
-        setMusicStatus(error.message);
-      }
-
-      function setMusicStatus(message) {
-        musicPlayerStatus.textContent = message;
-      }
-
-      function readSpotifySessionValue(key) {
-        try {
-          return sessionStorage.getItem(key);
-        } catch (error) {
-          throw new Error(`El navegador bloqueó el almacenamiento temporal: ${error.message}`);
-        }
-      }
-
-      function writeSpotifySessionValue(key, value) {
-        try {
-          sessionStorage.setItem(key, value);
-        } catch (error) {
-          throw new Error(`El navegador bloqueó el almacenamiento temporal: ${error.message}`);
-        }
-      }
-
-      function removeSpotifySessionValue(key) {
-        try {
-          sessionStorage.removeItem(key);
-        } catch (error) {
-          throw new Error(`El navegador bloqueó el almacenamiento temporal: ${error.message}`);
-        }
-      }
-
-      function encodeBase64Url(bytes) {
-        const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
-        return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-      }
-
-      function randomBase64Url(length) {
-        return encodeBase64Url(window.crypto.getRandomValues(new Uint8Array(length)));
-      }
-
-      function clearSpotifyCallbackParameters() {
-        window.history.replaceState(window.history.state, "", spotifyRedirectUri);
-      }
-
-      async function exchangeSpotifyToken(parameters) {
-        const response = await fetch("https://accounts.spotify.com/api/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ ...parameters, client_id: spotifyClientId }),
-        });
-        const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.error_description || result.error || "Spotify rechazó la autorización.");
-        }
-        spotifyAccessToken = result.access_token;
-        spotifyRefreshToken = result.refresh_token || spotifyRefreshToken;
-        spotifyTokenExpiresAt = Date.now() + result.expires_in * 1000;
-      }
-
-      async function getSpotifyAccessToken(forceRefresh = false) {
-        if (!spotifyAccessToken) throw new Error("Conecta primero tu cuenta de Spotify.");
-        if (!forceRefresh && Date.now() < spotifyTokenExpiresAt - 60000) return spotifyAccessToken;
-        if (!spotifyRefreshToken) throw new Error("La sesión de Spotify venció. Vuelve a conectar tu cuenta.");
-        await exchangeSpotifyToken({
-          grant_type: "refresh_token",
-          refresh_token: spotifyRefreshToken,
-        });
-        return spotifyAccessToken;
-      }
-
-      function connectSpotifyAccount() {
-        try {
-          const verifier = randomBase64Url(64);
-          const state = randomBase64Url(24);
-          window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)).then((digest) => {
-            writeSpotifySessionValue(spotifyVerifierKey, verifier);
-            writeSpotifySessionValue(spotifyStateKey, state);
-            if (musicTrackIds.includes(musicSelect.value)) {
-              writeSpotifySessionValue(spotifyTrackKey, musicSelect.value);
-            }
-            const authorizationUrl = new URL("https://accounts.spotify.com/authorize");
-            authorizationUrl.search = new URLSearchParams({
-              client_id: spotifyClientId,
-              response_type: "code",
-              redirect_uri: spotifyRedirectUri,
-              scope: spotifyScopes.join(" "),
-              code_challenge_method: "S256",
-              code_challenge: encodeBase64Url(new Uint8Array(digest)),
-              state,
-            });
-            window.location.assign(authorizationUrl.href);
-          }).catch((error) => {
-            setMusicStatus(`No se pudo iniciar sesión con Spotify: ${error.message}`);
-          });
-        } catch (error) {
-          setMusicStatus(`No se pudo iniciar sesión con Spotify: ${error.message}`);
-        }
-      }
-
-      function startSpotifyPlaybackSdk() {
-        if (spotifyPlayer || spotifySdkLoading) return;
-        if (window.Spotify) {
-          createSpotifyPlayer();
-          return;
-        }
-        spotifySdkLoading = true;
-        window.onSpotifyWebPlaybackSDKReady = createSpotifyPlayer;
-        const script = document.createElement("script");
-        script.src = "https://sdk.scdn.co/spotify-player.js";
-        script.async = true;
-        script.addEventListener("error", () => {
-          spotifySdkLoading = false;
-          musicConnectButton.disabled = false;
-          musicConnectButton.hidden = false;
-          setMusicStatus("No se pudo cargar el reproductor de Spotify. Revisa tu conexión e inténtalo de nuevo.");
-        }, { once: true });
-        document.body.append(script);
-      }
-
-      function createSpotifyPlayer() {
-        if (spotifyPlayer || !window.Spotify) return;
-        spotifySdkLoading = false;
-        spotifyPlayer = new window.Spotify.Player({
-          name: "Cumple de Pato",
-          volume: 0.8,
-          getOAuthToken: (callback) => {
-            getSpotifyAccessToken().then(callback).catch((error) => setMusicStatus(error.message));
-          },
-        });
-        spotifyPlayer.addListener("ready", ({ device_id: deviceId }) => {
-          spotifyDeviceId = deviceId;
-          musicConnectButton.disabled = false;
-          musicConnectButton.hidden = true;
-          musicPlayButton.hidden = false;
-          musicPlayerShell.hidden = true;
-          setMusicStatus("Spotify está conectado. Elige una canción y toca «Reproducir aquí en la página».");
-        });
-        spotifyPlayer.addListener("not_ready", () => {
-          spotifyDeviceId = "";
-          musicPlayButton.disabled = false;
-          musicPlayButton.hidden = true;
-          musicConnectButton.hidden = false;
-          setMusicStatus("El reproductor de Spotify se desconectó. Recarga la página e inicia sesión otra vez.");
-        });
-        spotifyPlayer.addListener("initialization_error", ({ message }) => {
-          musicConnectButton.disabled = false;
-          musicConnectButton.hidden = false;
-          setMusicStatus(`Spotify no pudo iniciar el reproductor: ${message}`);
-        });
-        spotifyPlayer.addListener("authentication_error", ({ message }) => {
-          setMusicStatus(`Spotify no pudo validar tu sesión: ${message}. Vuelve a conectar tu cuenta.`);
-          musicConnectButton.disabled = false;
-          musicConnectButton.hidden = false;
-          musicPlayButton.hidden = true;
-        });
-        spotifyPlayer.addListener("account_error", ({ message }) => {
-          setMusicStatus(`Spotify no permite reproducir en esta cuenta desde el navegador. Se requiere Spotify Premium. ${message}`);
-        });
-        spotifyPlayer.addListener("playback_error", ({ message }) => {
-          setMusicStatus(`Spotify no pudo reproducir esta canción: ${message}`);
-        });
-        spotifyPlayer.addListener("player_state_changed", (state) => {
-          const currentTrack = state?.track_window?.current_track;
-          if (!currentTrack) return;
-          spotifyCurrentTrackId = currentTrack.uri.split(":").pop();
-          spotifyIsPlaying = !state.paused;
-          musicPlayButton.textContent = spotifyIsPlaying && spotifyCurrentTrackId === musicSelect.value
-            ? "Pausar canción"
-            : "Reproducir aquí en la página";
-          if (spotifyIsPlaying) {
-            const selectedTrack = musicSelect.selectedOptions[0]?.textContent;
-            setMusicStatus(`Reproduciendo en esta página: ${selectedTrack || currentTrack.name}`);
-          }
-        });
-        spotifyPlayer.connect().then((connected) => {
-          if (!connected) {
-            musicConnectButton.disabled = false;
-            musicConnectButton.hidden = false;
-            setMusicStatus("No se pudo conectar el reproductor de Spotify. Inténtalo de nuevo.");
-          }
-        }).catch((error) => {
-          musicConnectButton.disabled = false;
-          musicConnectButton.hidden = false;
-          setMusicStatus(`No se pudo conectar con Spotify: ${error.message}`);
-        });
-      }
 
       function loadSelectedSpotifyTrack() {
         const trackId = musicSelect.value;
         if (!musicTrackIds.includes(trackId)) return;
-        try {
-          writeSpotifySessionValue(spotifyTrackKey, trackId);
-        } catch (error) {
-          setMusicStatus(error.message);
-          return;
-        }
+        musicPlayerShell.hidden = false;
         const songName = musicSelect.selectedOptions[0].textContent;
         musicPlayer.src = `https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`;
-        if (!spotifyPlayer) musicPlayerShell.hidden = false;
-        if (spotifyCurrentTrackId !== trackId) {
-          spotifyCurrentTrackId = "";
-          spotifyIsPlaying = false;
-          if (spotifyPlayer) musicPlayButton.textContent = "Reproducir aquí en la página";
-        }
-        setMusicStatus(spotifyPlayer
-          ? `Elegiste ${songName}. Toca «Reproducir aquí en la página» para escucharla con tu cuenta.`
-          : `Elegiste ${songName}. Conecta tu cuenta para reproducirla aquí en la página.`);
+        musicPlayerStatus.textContent = `Elegiste ${songName}. Reprodúcela aquí en Spotify.`;
       }
 
       musicSelect.addEventListener("change", () => {
         loadSelectedSpotifyTrack();
       });
-
-      musicConnectButton.addEventListener("click", connectSpotifyAccount);
-
-      musicPlayButton.addEventListener("click", async () => {
-        const trackId = musicSelect.value;
-        if (!musicTrackIds.includes(trackId)) {
-          setMusicStatus("Elige una canción antes de reproducirla.");
-          return;
-        }
-        if (!spotifyPlayer || !spotifyDeviceId) {
-          setMusicStatus("Conecta tu cuenta de Spotify y espera a que el reproductor esté listo.");
-          return;
-        }
-        musicPlayButton.disabled = true;
-        try {
-          if (spotifyIsPlaying && spotifyCurrentTrackId === trackId) {
-            await spotifyPlayer.pause();
-            spotifyIsPlaying = false;
-            musicPlayButton.textContent = "Reproducir aquí en la página";
-            setMusicStatus("Canción en pausa.");
-            return;
-          }
-          await spotifyPlayer.activateElement();
-          const accessToken = await getSpotifyAccessToken();
-          const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${encodeURIComponent(spotifyDeviceId)}`, {
-            method: "PUT",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ uris: [`spotify:track:${trackId}`] }),
-          });
-          if (response.status === 401 && spotifyRefreshToken) {
-            await getSpotifyAccessToken(true);
-            const retry = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${encodeURIComponent(spotifyDeviceId)}`, {
-              method: "PUT",
-              headers: {
-                Authorization: `Bearer ${spotifyAccessToken}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ uris: [`spotify:track:${trackId}`] }),
-            });
-            if (!retry.ok) {
-              const error = await retry.json().catch(() => ({}));
-              if (retry.status === 403) {
-                throw new Error("Spotify requiere una cuenta Premium para reproducir canciones completas en la página.");
-              }
-              throw new Error(error.error?.message || `Spotify respondió con el error ${retry.status}.`);
-            }
-          } else if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            if (response.status === 403) {
-              throw new Error("Spotify requiere una cuenta Premium para reproducir canciones completas en la página.");
-            }
-            throw new Error(error.error?.message || `Spotify respondió con el error ${response.status}.`);
-          }
-          spotifyCurrentTrackId = trackId;
-          spotifyIsPlaying = true;
-          musicPlayButton.textContent = "Pausar canción";
-          setMusicStatus(`Reproduciendo en esta página: ${musicSelect.selectedOptions[0].textContent}`);
-        } catch (error) {
-          setMusicStatus(`No se pudo reproducir la canción en Spotify: ${error.message}`);
-        } finally {
-          musicPlayButton.disabled = false;
-        }
-      });
-
-      async function completeSpotifyAuthorization() {
-        const parameters = new URLSearchParams(window.location.search);
-        const code = parameters.get("code");
-        const authorizationError = parameters.get("error");
-        if (authorizationError) {
-          clearSpotifyCallbackParameters();
-          setMusicStatus(`No se autorizó Spotify: ${parameters.get("error_description") || authorizationError}.`);
-          return;
-        }
-        if (!code) return;
-        const expectedState = readSpotifySessionValue(spotifyStateKey);
-        const state = parameters.get("state");
-        const verifier = readSpotifySessionValue(spotifyVerifierKey);
-        removeSpotifySessionValue(spotifyStateKey);
-        removeSpotifySessionValue(spotifyVerifierKey);
-        clearSpotifyCallbackParameters();
-        if (!state || state !== expectedState || !verifier) {
-          setMusicStatus("No se pudo verificar la autorización de Spotify. Vuelve a conectar tu cuenta.");
-          return;
-        }
-        musicConnectButton.disabled = true;
-        setMusicStatus("Conectando tu cuenta de Spotify…");
-        try {
-          await exchangeSpotifyToken({
-            grant_type: "authorization_code",
-            code,
-            redirect_uri: spotifyRedirectUri,
-            code_verifier: verifier,
-          });
-          startSpotifyPlaybackSdk();
-        } catch (error) {
-          musicConnectButton.disabled = false;
-          setMusicStatus(`No se pudo conectar con Spotify: ${error.message}. Revisa la URL de redirección de la app.`);
-        }
-      }
 
       musicWidgetToggle.addEventListener("click", () => {
         const isExpanded = musicWidgetToggle.getAttribute("aria-expanded") === "true";
@@ -2348,10 +1999,6 @@
         musicWidgetToggle.setAttribute("aria-expanded", String(!isExpanded));
         musicWidgetToggle.setAttribute("aria-label", isExpanded ? "Expandir reproductor" : "Minimizar reproductor");
         musicWidgetToggle.textContent = isExpanded ? "+" : "−";
-      });
-
-      completeSpotifyAuthorization().catch((error) => {
-        setMusicStatus(`No se pudo completar el inicio de sesión de Spotify: ${error.message}`);
       });
 
       const themedSymbols = [
