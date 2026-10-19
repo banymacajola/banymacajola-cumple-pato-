@@ -252,25 +252,6 @@
       line-height: 1.4;
     }
 
-    .music-youtube-link {
-      display: grid;
-      min-height: 44px;
-      place-items: center;
-      padding: 9px 12px;
-      border: 1px solid #a20e16;
-      border-radius: 10px;
-      background: #e62117;
-      color: #fff;
-      font-size: 14px;
-      font-weight: 800;
-      text-align: center;
-      text-decoration: none;
-      touch-action: manipulation;
-    }
-
-    .music-youtube-link:focus-visible { outline: 3px solid var(--purple); outline-offset: 2px; }
-    .music-youtube-link[hidden] { display: none; }
-
     .music-player-shell {
       width: 100%;
       aspect-ratio: 16 / 9;
@@ -1675,11 +1656,9 @@
           <option value="ZCh1O-7oTUI">Mil tormentas</option>
           <option value="o1LulB1uFOA">Mi vida entera</option>
           <option value="lkg-eJqUGfg">Mi nuevo vicio</option>
-          <option value="search:De Ludwin para ti">De Ludwin para ti</option>
-          <option value="search:De mí para ti">De mí para ti</option>
+          <option value="search:De Ludwin para ti">De cortesía de Ludwin</option>
         </select>
         <p class="music-player-status" id="music-player-status" role="status" aria-live="polite">Elige una canción para reproducirla en YouTube aquí en la página.</p>
-        <a class="music-youtube-link" id="music-youtube-link" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" hidden>Abrir en YouTube</a>
         <div class="music-player-shell" id="music-player-shell" aria-label="Reproductor de YouTube" hidden>
           <iframe
             id="music-player"
@@ -1999,21 +1978,15 @@
       const musicPlayer = document.getElementById("music-player");
       const musicPlayerShell = document.getElementById("music-player-shell");
       const musicPlayerStatus = document.getElementById("music-player-status");
-      const musicYoutubeLink = document.getElementById("music-youtube-link");
-
       function loadSelectedYoutubeTrack() {
         const track = musicSelect.selectedOptions[0];
         const trackId = track?.value;
         if (!trackId) return;
         const songName = musicSelect.selectedOptions[0].textContent;
         if (trackId.startsWith("search:")) {
-          const query = `${songName} canción oficial`;
           musicPlayer.removeAttribute("src");
           musicPlayerShell.hidden = true;
-          musicYoutubeLink.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-          musicYoutubeLink.textContent = `Buscar «${songName}» en YouTube`;
-          musicYoutubeLink.hidden = false;
-          musicPlayerStatus.textContent = "No hay un video verificado para esta canción; puedes buscarla en YouTube.";
+          musicPlayerStatus.textContent = `No hay un video disponible para reproducir «${songName}» aquí.`;
           return;
         }
         const playerParameters = new URLSearchParams({
@@ -2023,9 +1996,6 @@
         });
         musicPlayer.src = `https://www.youtube.com/embed/${encodeURIComponent(trackId)}?${playerParameters}`;
         musicPlayerShell.hidden = false;
-        musicYoutubeLink.href = `https://www.youtube.com/watch?v=${encodeURIComponent(trackId)}`;
-        musicYoutubeLink.textContent = "Abrir en YouTube";
-        musicYoutubeLink.hidden = false;
         musicPlayerStatus.textContent = `Reproduce ${songName} aquí en la página.`;
       }
 
